@@ -1,25 +1,21 @@
 import os
 import re
-from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
 import PyPDF2
+from sentence_transformers import SentenceTransformer
 from transformers import pipeline
 import numpy as np
 
-# Initialize the model for vectorization
-model = SentenceTransformer('all-MiniLM-L6-v2')
+# Step 1: Initialize the model for vectorization and QA pipeline
+model = SentenceTransformer('all-MiniLM-L6-v2')  # Sentence transformer for vectorization
+qa_pipeline = pipeline("question-answering", model="distilbert-base-uncased-distilled-squad")  # QA pipeline
 
-# Initialize the summarizer
-summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-
-# Initialize Chroma client
+# Step 2: Initialize Chroma client
 client = chromadb.PersistentClient(settings=Settings(anonymized_telemetry=False), path="./chroma_db")
-
-# Name of the collection to delete
 collection_name = "documents"
 
-# Check if the collection exists
+# Check and delete existing collection if it exists
 try:
     collection = client.get_collection(collection_name)
     print(f"The collection '{collection_name}' exists. Deleting it...")
@@ -32,13 +28,13 @@ except Exception as e:
 collection = client.create_collection(collection_name)
 print(f"The collection '{collection_name}' has been recreated.")
 
-# Function to clean the text by removing unnecessary characters
+# Step 3: Function to clean the text (remove special characters, unnecessary spaces)
 def clean_text(text):
     text = re.sub(r'[^a-zA-Z0-9\s]', '', text)  # Remove special characters
     text = re.sub(r'\s+', ' ', text).strip()    # Remove extra spaces
     return text
 
-# Function to load and preprocess documents
+# Step 4: Function to extract and preprocess PDF documents
 def load_documents(folder_path):
     docs = {}
     if not os.path.isdir(folder_path):
@@ -52,26 +48,23 @@ def load_documents(folder_path):
                     reader = PyPDF2.PdfReader(f)
                     text = ''.join(page.extract_text() for page in reader.pages)
                     cleaned_text = clean_text(text)
-                    chunks = cleaned_text.split('.')
-                    chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
-                    docs[file_name] = chunks
-                    print(f"Processed document: {file_name} with {len(chunks)} chunks")
+                    docs[file_name] = cleaned_text
+                    print(f"Processed document: {file_name}")
             except Exception as e:
                 print(f"Error reading PDF {file_name}: {e}")
     return docs
 
-# Function to vectorize documents
-def vectorize_documents(preprocessed_documents):
-    document_vectors = {}
-    for file_name, chunks in preprocessed_documents.items():
+# Step 5: Function to vectorize documents and store in Chroma
+def vectorize_and_store_documents(documents):
+    for file_name, text in documents.items():
+        # Split text into chunks (optional, you can split based on content size)
+        chunks = text.split('.')
+        chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+        
+        # Vectorize the chunks
         vectors = model.encode(chunks)
-        document_vectors[file_name] = vectors
-        print(f"Vectorized {len(chunks)} chunks from document: {file_name}")
-    return document_vectors
-
-# Function to store vectors in Chroma
-def store_vectors_in_chroma(document_vectors):
-    for file_name, vectors in document_vectors.items():
+        
+        # Store the vectors in Chroma
         for idx, vector in enumerate(vectors):
             doc_id = f"{file_name}_chunk_{idx+1}"
             collection.add(
@@ -82,93 +75,67 @@ def store_vectors_in_chroma(document_vectors):
             )
             print(f"Stored vector for {file_name} chunk {idx+1} in Chroma with ID {doc_id}")
 
-# Function to highlight keywords
-def highlight_keywords(text, keyword):
-    return text.replace(keyword, f"\033[1;31m{keyword}\033[0m")
-
-# Function to summarize text
-def summarize_text(text, max_length=25, min_length=10):
-    try:
-        if len(text.split()) < min_length:
-            return text
-        summary = summarizer(text, max_length=max_length, min_length=min_length, do_sample=False)
-        return summary[0]['summary_text']
-    except Exception as e:
-        print(f"Error summarizing text: {e}")
-        return text
-
-# Function to check similarity threshold
-def is_relevant(query, document_text, similarity_threshold=0.5):
-    # Convert document text and query into embeddings
-    query_vector = model.encode([query])[0]
-    document_vector = model.encode([document_text])[0]
-    
-    # Calculate cosine similarity
-    similarity = np.dot(query_vector, document_vector) / (np.linalg.norm(query_vector) * np.linalg.norm(document_vector))
-    
-    # Return True if similarity exceeds the threshold
-    return similarity >= similarity_threshold
-
-# Function to search and filter documents
-def search_documents(query, n_results=3, similarity_threshold=0.5):
+# Step 6: Function to answer the query based on stored documents
+def answer_query(query, n_results=3):
+    # Create a query vector from the question
     query_vector = model.encode([query])
-
-    # Perform the query in Chroma
+    
+    # Perform the query in Chroma to get relevant document chunks
     results = collection.query(
         query_embeddings=query_vector.tolist(),
         n_results=n_results
     )
+    print("Retrieved documents:", results['documents'])
 
-    # Filter documents based on relevance to the query
-    document_matches = {}
-    if results['documents']:
-        print(f"Found {len(results['documents'][0])} matching documents for query: '{query}'")
+    # If no results found, return a message
+    if not results['documents']:
+        return "No relevant documents found."
 
-        for i, document in enumerate(results['documents'][0]):
-            metadata = results['metadatas'][0][i]
-            file_name = metadata.get('file_name', 'Unknown')
-            document_text = document
+    # Prepare to store the answers
+    answers = []
 
-            # Filter documents based on similarity
-            if is_relevant(query, document_text, similarity_threshold):
-                if file_name not in document_matches:
-                    document_matches[file_name] = {'chunks': []}
+    # Iterate over retrieved results and answer based on document context
+    for i, document in enumerate(results['documents'][0]):
+        metadata = results['metadatas'][0][i]
+        file_name = metadata.get('file_name', 'Unknown')
+        document_text = document
 
-                document_matches[file_name]['chunks'].append(document)
+        # Use the QA model to extract the answer from the document text
+        answer = qa_pipeline(question=query, context=document_text)
+        if answer['score'] > 0.2:  # Lower confidence threshold for answers
+            answers.append((file_name, answer["answer"]))
+    
+    # Return the top answers
+    return answers if answers else ["Could not find a confident answer."]
 
-        # Now print full document content
-        if document_matches:
-            for file_name, match_info in document_matches.items():
-                full_content = " ".join(match_info['chunks'])  # Combine chunks
-                highlighted_content = highlight_keywords(full_content, query)
-                summary = summarize_text(full_content)
-
+# Main function to run the entire process
+def run_project(folder_path, query):
+    print("Loading and processing documents...")
+    documents = load_documents(folder_path)
+    
+    print("Vectorizing and storing documents...")
+    vectorize_and_store_documents(documents)
+    
+    print(f"Answering the query: '{query}'")
+    answers = answer_query(query, n_results=3)
+    
+    if isinstance(answers, list):
+        if all(isinstance(a, tuple) and len(a) == 2 for a in answers):  # Checking if it's a list of tuples
+            for file_name, answer in answers:
                 print(f"\nDocument: {file_name}")
-                print(f"Highlighted Content: {highlighted_content}")
-                print(f"Summary: {summary}\n")
+                print(f"Answer: {answer}")
         else:
-            print("No relevant results found.")
+            print("Unexpected answer format. Here are the raw answers:")
+            for answer in answers:
+                print(answer)
     else:
-        print("No results found.")
+        print(answers)
 
+# Path to the folder containing your PDF documents
+folder_path = "data/sample_docs"  # Replace with your folder path
 
-# Main function to preprocess and store in Chroma
-def preprocess_and_store_in_chroma(folder_path):
-    print("Loading and preprocessing documents...")
-    preprocessed_documents = load_documents(folder_path)
-    
-    print("Vectorizing documents...")
-    document_vectors = vectorize_documents(preprocessed_documents)
-    
-    print("Storing vectors in Chroma...")
-    store_vectors_in_chroma(document_vectors)
+# Query to test: asking whose resume is this
+query = "What is the address in resume?"
 
-# Set the folder path containing your documents
-folder_path = "data/sample_docs"  # Update this path
-
-# Run the process
-preprocess_and_store_in_chroma(folder_path)
-
-# Example query to test the search functionality
-search_query = "resume"
-search_documents(search_query)
+# Run the project
+run_project(folder_path, query)
