@@ -1,174 +1,91 @@
 
-# Document Summarizer, Searcher, and Question Answering System
+# DocuVerse
+Document Search and Summarization with Question Answering and Vector Search
 
-This project is a **Document Summarizer**, **File Searcher**, and **Question Answering System** that processes PDF documents, stores them as vectors, and allows searching for relevant documents based on a given query. The documents are stored and indexed using Chroma, and vectors are generated using `SentenceTransformers`. The tool can highlight matching keywords, summarize the content of documents that match the search query, and even answer specific questions based on document content.
+This project allows you to load, preprocess, vectorize, and store documents (PDFs) in a Chroma vector database. It leverages Natural Language Processing (NLP) techniques for tasks such as search, document summarization, and question answering using large language models (LLMs). The application uses a combination of pre-trained models for document embeddings, summarization, and QA tasks, and integrates a vector search mechanism to retrieve relevant document chunks based on a query.
 
-## Features
+## Project Overview
 
-- **Document Summarization**: Extracts and summarizes text from PDF files using the BART model.
-- **Search Functionality**: Search documents by providing a query, and get results with the most relevant content.
-- **Keyword Highlighting**: Highlight keywords in documents that match the search query.
-- **Chroma Database Integration**: Stores document embeddings (vectors) for fast and efficient similarity search.
-- **Question Answering**: Provides answers to specific questions based on document content using a question-answering pipeline.
+The project aims to:
+- Preprocess documents (PDFs) by extracting and cleaning text.
+- Vectorize document text into embeddings using the SentenceTransformer model.
+- Store these embeddings in a Chroma vector database.
+- Use Chroma to search and retrieve relevant document chunks based on query embeddings.
+- Implement document summarization and keyword highlighting to improve document relevance.
+- Provide question-answering functionality based on document context.
+
+## Key Features
+- **Document Preprocessing**: Cleans and extracts text from PDFs, handles chunking of large documents.
+- **Vectorization**: Uses `SentenceTransformer` to convert document text into vector embeddings.
+- **Chroma Vector Database**: Leverages Chroma to store and query vectorized document data.
+- **Search**: Find relevant document chunks based on similarity to a query using cosine similarity.
+- **Summarization**: Automatically summarizes document content using `facebook/bart-large-cnn`.
+- **Question Answering**: Uses `transformers` pipeline to provide answers from the document context.
+
+## How it Works
+1. **Preprocessing**: The application loads PDF files from a specified folder, extracts and cleans text, then splits the text into chunks for vectorization.
+2. **Vectorization**: Each chunk is converted into an embedding using a pre-trained `SentenceTransformer` model.
+3. **Storage in Chroma**: The document embeddings are stored in a Chroma vector database for efficient querying.
+4. **Querying**: Users can input queries, and the system finds the most relevant document chunks based on the query's similarity to stored embeddings.
+5. **Summarization**: Once relevant chunks are identified, the system provides a summary for the document.
+6. **Question Answering**: Users can ask specific questions, and the system will return an answer based on the document's content.
+
+## Requirements
+- Python 3.8+
+- Install the required dependencies using the following command:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Setup and Usage
+1. Clone the repository:
+    ```bash
+    git clone <repo-url>
+    cd <repo-directory>
+    ```
+
+2. Prepare your documents:
+    - Place your PDF files in the `data` folder.
+
+3. Run the preprocessing and store the documents in Chroma:
+    ```bash
+    python preprocess_and_store_in_chroma.py
+    ```
+
+4. To perform a search or question answering, run:
+    ```bash
+    python search_or_qa.py
+    ```
+
+   You can change the query inside the `search_or_qa.py` file or modify it to accept dynamic input.
+
+## Matching the Role Requirements
+
+This project demonstrates the following capabilities that match the requirements of the role you are applying for:
+1. **Understanding of prompt engineering and prompt tuning**:
+   - The project leverages pre-trained models such as `SentenceTransformer` and `facebook/bart-large-cnn` for document vectorization, summarization, and question answering. These models can be fine-tuned or extended based on specific use cases, showcasing an understanding of prompt engineering.
+
+2. **Experience building applications using LLM frameworks such as LangChain, Llama Index, and Semantic Kernel**:
+   - While LangChain and Llama Index aren't directly integrated in this version, the core functionalities such as vector search and summarization can be easily extended to include these frameworks. The use of transformers for QA and summarization is also similar in nature to these frameworks.
+
+3. **Experience with vector databases like Faiss or Chroma**:
+   - The project uses Chroma as a vector database for storing and querying document embeddings, aligning with the requirement for familiarity with vector databases like Faiss.
+
+4. **Knowledge of ML model evaluation**:
+   - The project uses cosine similarity to evaluate the relevance of document chunks to the query, ensuring consistent performance and relevance. Fine-tuning the models or the evaluation strategy can be added to handle different types of documents and queries.
+
+5. **Familiarity with MLOps and ML model lifecycle pipelines**:
+   - The project integrates pre-trained models into an end-to-end pipeline from document preprocessing to vectorization, storage, and querying, demonstrating basic MLOps principles. The process can be extended to include model training and fine-tuning.
+
+6. **Experience with ML model training and fine-tuning**:
+   - While this project does not include training from scratch, it leverages pre-trained models that can be further fine-tuned or replaced with custom models, matching the requirement for ML model training and fine-tuning experience.
 
 ## File Structure
-
-- `README.md`: Project documentation (this file).
-- `app.py`: Main application file for searching matching files based on a search query and answering questions.
-- `delete_db.py`: Script for deleting the Chroma database.
-- `requirements.txt`: List of required Python packages for the project.
-- `scripts/`: Directory containing Python scripts for various functionalities (document summarization, vectorization, etc.).
-- `data/`: Folder containing input PDF files for processing (documents to be indexed and searched).
-
-## Setup and Installation
-
-### Prerequisites
-
-Ensure you have the following software installed on your system:
-
-- **Python** 3.8 or higher
-- **pip** (Python package installer)
-- **Git** (optional, for version control)
-
-### Installation Steps
-
-1. **Clone the Repository**:
-
-   If you haven't already, clone the repository to your local machine:
-
-   ```bash
-   git clone https://github.com/your-username/document-summarizer-and-searcher.git
-   cd document-summarizer-and-searcher
-   ```
-
-2. **Install Dependencies**:
-
-   Install the required Python dependencies by running:
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-   The `requirements.txt` file contains the following key dependencies:
-   - `sentence-transformers` - For generating document embeddings.
-   - `chroma` - For document storage and search.
-   - `PyPDF2` - For reading and extracting text from PDF files.
-   - `transformers` - For text summarization and question answering using BART.
-   - `numpy` - For numerical operations.
-
-3. **Set Up Chroma Database**:
-
-   Chroma is used to store vectorized document embeddings. By default, the Chroma database will be created in a folder named `./chroma_db` in your project directory. You can change the path by modifying the script if needed.
-
-4. **Prepare Documents**:
-
-   Place the PDF documents you want to process inside the `data/` folder. You can add or remove PDF files as required.
-
-   Example structure:
-
-   ```
-   data/
-     └── sample_docs/
-         ├── document1.pdf
-         ├── document2.pdf
-         └── document3.pdf
-   ```
-
-5. **Run the Application**:
-
-   You can now run the main application to preprocess the documents, store the vectors, and search for content:
-
-   ```bash
-   python app.py
-   ```
-
-   This will:
-   - Preprocess the PDF files by extracting and cleaning the text.
-   - Vectorize the text using the `SentenceTransformer` model.
-   - Store the vectors in the Chroma database.
-   - Enable searching for documents using a provided query.
-
-6. **Search Functionality**:
-
-   To perform a search, simply update the `search_query` variable in `app.py` with your desired query. The application will search the indexed documents and return the most relevant results.
-
-   Example:
-
-   ```python
-   search_query = "your search query"
-   ```
-
-7. **Question Answering**:
-
-   You can also query the documents with a specific question, and the system will attempt to answer based on the document content.
-
-   Example:
-
-   ```python
-   question = "What is the main topic of the document?"
-   ```
-
-   The application will search for the relevant document(s) and provide an answer based on the content.
-
-8. **Delete Chroma Database** (Optional):
-
-   If you need to clear the Chroma database and start fresh, run the `delete_db.py` script:
-
-   ```bash
-   python delete_db.py
-   ```
-
-   This will delete the existing Chroma collection and recreate it.
-
-## Usage
-
-1. **Search for Files**:
-   - Provide a search query to search through the indexed PDF files.
-   - The application will return the most relevant documents based on the query's semantic similarity.
-
-2. **Summarization**:
-   - The application automatically summarizes the text from the matched documents.
-   - The summary is generated using the BART model.
-
-3. **Keyword Highlighting**:
-   - The search results display the document content with matching keywords highlighted.
-
-4. **Question Answering**:
-   - The application answers specific questions based on the content of the documents.
-   - The question-answering model analyzes the text and provides relevant answers.
-
-## Example Workflow
-
-1. Add PDF files to the `data/sample_docs` folder.
-2. Run `app.py` to process and index documents.
-3. Change the `search_query` variable in `app.py` to test different search queries.
-4. Change the `question` variable in `app.py` to test question answering.
-5. Run the application to see results with summarized text, highlighted keywords, and question answering.
-
-## Contributing
-
-Contributions are welcome! Please feel free to fork the repository, create a new branch, and submit a pull request with your changes.
-
-### How to contribute:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature-name`).
-3. Make your changes.
-4. Commit your changes (`git commit -m 'Add your changes'`).
-5. Push to your branch (`git push origin feature/your-feature-name`).
-6. Open a pull request with a description of your changes.
+- `data/`: Contains the folder for input PDFs.
+- `scripts/`: Contains the core logic for preprocessing, vectorizing, and storing documents in Chroma.
+- `app.py`: Main application file for running search queries and question answering.
+- `requirements.txt`: List of dependencies required to run the project.
 
 ## License
-
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## Acknowledgments
-
-- [Hugging Face](https://huggingface.co/) for providing the BART model for text summarization and question answering.
-- [Sentence-Transformers](https://www.sbert.net/) for the embeddings model.
-- [Chroma](https://www.trychroma.com/) for vector database management.
-- [PyPDF2](https://github.com/mstamy2/PyPDF2) for PDF text extraction.
-
----
-
-Feel free to adapt this README according to your specific needs or project updates!
