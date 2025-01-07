@@ -47,16 +47,16 @@ The project aims to:
 2. Prepare your documents:
     - Place your PDF files in the `data` folder.
 
-3. Run the preprocessing and store the documents in Chroma:
+3. To perform a search or question answering or summarizer, run:
     ```bash
-    python preprocess_and_store_in_chroma.py
+    python searching_for_file.py
     ```
-
-4. To perform a search or question answering, run:
+     ```bash
+    python question_answering.py
+    ```
     ```bash
-    python search_or_qa.py
+    python document_summarizer.py
     ```
-
    You can change the query inside the `search_or_qa.py` file or modify it to accept dynamic input.
 
 ## Matching the Role Requirements
