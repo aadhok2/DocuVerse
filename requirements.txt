@@ -1,0 +1,20 @@
+# Core Libraries
+numpy==1.24.3
+
+# Machine Learning and Transformers
+sentence-transformers==2.2.2
+transformers==4.34.0
+torch==2.0.1
+
+# ChromaDB (Vector Database)
+chromadb==0.4.0
+
+# PDF Processing
+PyPDF2==3.0.1
+
+# Utility Libraries (Regex is part of Python standard library, no need to list it)
+os
+
+# Flask (Optional, if used for APIs or Web App Integration)
+flask==2.3.3
+flask-cors==4.0.0
